@@ -1,26 +1,37 @@
-import librosa.display
-import librosa
-import glob
+import os
+import random
 import numpy as np
+import pandas as pd
+import librosa
+import librosa.display
 import matplotlib.pyplot as plt
+import seaborn as sn
+from sklearn import model_selection
+from sklearn import preprocessing
+import IPython.display as ipd
 from pathlib import Path
 
+sampling-rate = 44100
 
-def extract_logmel(wav, sr, n_mels=128): #Output -> (timeframe, logmel_dim)
-    audio, _ = librosa.load(wav, sr=sr)
-    logmel = librosa.power_to_db(librosa.feature.melspectrogram(y=audio, sr=sr, n_mels=n_mels)).T
-    return logmel
+def wavfileList(dirname = "."):
+    _list = Path().glob("./{}/*.wav".format(dirname))
+    return _list
 
-# Load a flac file from 0(s) to 60(s) and resample to 4.41 KHz
-for i in range(1, 11):
-    filename = './example-data/not-song/{:03}.wav'.format(i)
-    y, sr = librosa.load(filename)
+def calculate_melsp(x, n_fft=1024, hop_length=128):
+    stft = np.abs(librosa.stft(x, n_fft=n_fft, hop_length=hop_length))**2
+    log_stft = librosa.power_to_db(stft)
+    melsp = librosa.feature.melspectrogram(S=log_stft,n_mels=128)
+    return melsp
 
-    S = librosa.feature.melspectrogram(y, sr=sr, n_mels=128)
-    log_S = librosa.amplitude_to_db(S, ref=np.max)
-    plt.figure(figsize=(12, 4))
-    librosa.display.specshow(log_S, sr=sr, x_axis='time', y_axis='mel')
-    plt.title('mel power spectrogram')
-    plt.colorbar(format='%02.0f dB')
-    plt.savefig('./result/not-song/{:03}.png'.format(i))
+def save_np_data(filename, x, y, aug=None, rates=None):
+    np_data = np.zeros(freq*time*len(x)).reshape(len(x), freq, time)
+    np_targets = np.zeros(len(y))
+    for i in range(len(y)):
+        _x, fs = load_wave_data(audio_dir, x[i])
+        if aug is not None:
+            _x = aug(x=_x, rate=rates[i])
+        _x = calculate_melsp(_x)
+        np_data[i] = _x
+        np_targets[i] = y[i]
+    np.savez(filename, x=np_data, y=np_targets)
 

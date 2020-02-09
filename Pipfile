@@ -11,6 +11,9 @@ librosa = "*"
 numpy = "*"
 matplotlib = "*"
 pyqt5 = "*"
+pandas = "*"
+seaborn = "*"
+ipython = "*"
 
 [requires]
 python_version = "3.7"
