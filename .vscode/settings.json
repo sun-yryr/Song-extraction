@@ -1,3 +1,4 @@
 {
-    "python.pythonPath": "/Users/sun-mm/.local/share/virtualenvs/Song-extraction-P2pz-7zp/bin/python"
+    "python.pythonPath": "/Users/sun-mm/.local/share/virtualenvs/Song-extraction-P2pz-7zp/bin/python",
+    "codic.case": "camelCase"
 }

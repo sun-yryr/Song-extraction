@@ -1,6 +1,7 @@
 .DS_Store
 *.wav
 *.png
+*.npz
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

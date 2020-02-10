@@ -1,37 +1,76 @@
-import os
-import random
+import keras
+from keras.models import Model
+from keras.layers import Input, Dense, Dropout, Activation
+from keras.layers import Conv2D, GlobalAveragePooling2D
+from keras.layers import BatchNormalization, Add
+from keras.callbacks import EarlyStopping, ModelCheckpoint
 import numpy as np
-import pandas as pd
-import librosa
-import librosa.display
-import matplotlib.pyplot as plt
-import seaborn as sn
-from sklearn import model_selection
-from sklearn import preprocessing
-import IPython.display as ipd
-from pathlib import Path
+import os
 
-sampling-rate = 44100
+# load npz files
+npz = np.load('./v-melsp-learn.npz')
+y_train = npz['y']
+x_train = npz['x']
+npz = np.load('./v-melsp-test.npz')
+y_test = npz['y']
+x_test = npz['x']
 
-def wavfileList(dirname = "."):
-    _list = Path().glob("./{}/*.wav".format(dirname))
-    return _list
+# redefine target data into one hot vector
+classes = 2
+y_train = keras.utils.to_categorical(y_train, classes)
+y_test = keras.utils.to_categorical(y_test, classes)
 
-def calculate_melsp(x, n_fft=1024, hop_length=128):
-    stft = np.abs(librosa.stft(x, n_fft=n_fft, hop_length=hop_length))**2
-    log_stft = librosa.power_to_db(stft)
-    melsp = librosa.feature.melspectrogram(S=log_stft,n_mels=128)
-    return melsp
+def cba(inputs, filters, kernel_size, strides):
+    x = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same')(inputs)
+    x = BatchNormalization()(x)
+    x = Activation("relu")(x)
+    return x
 
-def save_np_data(filename, x, y, aug=None, rates=None):
-    np_data = np.zeros(freq*time*len(x)).reshape(len(x), freq, time)
-    np_targets = np.zeros(len(y))
-    for i in range(len(y)):
-        _x, fs = load_wave_data(audio_dir, x[i])
-        if aug is not None:
-            _x = aug(x=_x, rate=rates[i])
-        _x = calculate_melsp(_x)
-        np_data[i] = _x
-        np_targets[i] = y[i]
-    np.savez(filename, x=np_data, y=np_targets)
+# define CNN
+inputs = Input(shape=(x_train.shape))
 
+x_1 = cba(inputs, filters=32, kernel_size=(1,8), strides=(1,2))
+x_1 = cba(x_1, filters=32, kernel_size=(8,1), strides=(2,1))
+x_1 = cba(x_1, filters=64, kernel_size=(1,8), strides=(1,2))
+x_1 = cba(x_1, filters=64, kernel_size=(8,1), strides=(2,1))
+
+x_2 = cba(inputs, filters=32, kernel_size=(1,16), strides=(1,2))
+x_2 = cba(x_2, filters=32, kernel_size=(16,1), strides=(2,1))
+x_2 = cba(x_2, filters=64, kernel_size=(1,16), strides=(1,2))
+x_2 = cba(x_2, filters=64, kernel_size=(16,1), strides=(2,1))
+
+x_3 = cba(inputs, filters=32, kernel_size=(1,32), strides=(1,2))
+x_3 = cba(x_3, filters=32, kernel_size=(32,1), strides=(2,1))
+x_3 = cba(x_3, filters=64, kernel_size=(1,32), strides=(1,2))
+x_3 = cba(x_3, filters=64, kernel_size=(32,1), strides=(2,1))
+
+x_4 = cba(inputs, filters=32, kernel_size=(1,64), strides=(1,2))
+x_4 = cba(x_4, filters=32, kernel_size=(64,1), strides=(2,1))
+x_4 = cba(x_4, filters=64, kernel_size=(1,64), strides=(1,2))
+x_4 = cba(x_4, filters=64, kernel_size=(64,1), strides=(2,1))
+
+x = Add()([x_1, x_2, x_3, x_4])
+
+x = cba(x, filters=128, kernel_size=(1,16), strides=(1,2))
+x = cba(x, filters=128, kernel_size=(16,1), strides=(2,1))
+
+x = GlobalAveragePooling2D()(x)
+x = Dense(classes)(x)
+x = Activation("softmax")(x)
+
+model = Model(inputs, x)
+
+# initiate Adam optimizer
+opt = keras.optimizers.adam(lr=0.00001, decay=1e-6, amsgrad=True)
+
+# Let's train the model using Adam with amsgrad
+model.compile(loss='categorical_crossentropy',
+              optimizer=opt,
+              metrics=['accuracy'])
+
+# model.summary()
+
+history = model.fit(x_train, y_train, epochs=100, verbose=1, validation_split=0.1)
+json_string = model.to_json()
+open(os.path.join('./', 'cnn_model.json'), 'w').write(json_string)
+model.save_weights(os.path.join('./', 'cnn_model_weight.hdf5'))
