@@ -19,6 +19,7 @@ x_test = npz['x']
 classes = 2
 y_train = keras.utils.to_categorical(y_train, classes)
 y_test = keras.utils.to_categorical(y_test, classes)
+x_train = x_train.reshape(252, 128, 3713, 1)
 
 def cba(inputs, filters, kernel_size, strides):
     x = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same')(inputs)
@@ -27,7 +28,7 @@ def cba(inputs, filters, kernel_size, strides):
     return x
 
 # define CNN
-inputs = Input(shape=(x_train.shape))
+inputs = Input(shape=(x_train.shape[1:]))
 
 x_1 = cba(inputs, filters=32, kernel_size=(1,8), strides=(1,2))
 x_1 = cba(x_1, filters=32, kernel_size=(8,1), strides=(2,1))
