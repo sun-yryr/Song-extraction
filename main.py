@@ -15,11 +15,11 @@ npz = np.load('./v-melsp-test.npz')
 y_test = npz['y']
 x_test = npz['x']
 
+x_train = x_train.reshape(252, 128, 3713, 1)
 # redefine target data into one hot vector
 classes = 2
 y_train = keras.utils.to_categorical(y_train, classes)
 y_test = keras.utils.to_categorical(y_test, classes)
-x_train = x_train.reshape(252, 128, 3713, 1)
 
 def cba(inputs, filters, kernel_size, strides):
     x = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same')(inputs)
@@ -62,7 +62,7 @@ x = Activation("softmax")(x)
 model = Model(inputs, x)
 
 # initiate Adam optimizer
-opt = keras.optimizers.adam(lr=0.00001, decay=1e-6, amsgrad=True)
+opt = keras.optimizers.adam(lr=0.00001, decay=1e-7, amsgrad=True)
 
 # Let's train the model using Adam with amsgrad
 model.compile(loss='categorical_crossentropy',
@@ -71,7 +71,5 @@ model.compile(loss='categorical_crossentropy',
 
 # model.summary()
 
-history = model.fit(x_train, y_train, epochs=100, verbose=1, validation_split=0.1)
-json_string = model.to_json()
-open(os.path.join('./', 'cnn_model.json'), 'w').write(json_string)
-model.save_weights(os.path.join('./', 'cnn_model_weight.hdf5'))
+model.fit(x_train, y_train, epochs=2, verbose=1, validation_split=0.1, batch_size=1)
+model.save("model_second_cnn.h5")
