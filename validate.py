@@ -41,12 +41,10 @@ def formatData(filename, aug=None, rates=None):
 
 # 90%超えてたら判定する
 def checkSong(ret):
-    if ret[0][0] > 0.9:
+    if ret[0][0] > 0.85:
         return "song"
-    elif ret[0][1] > 0.9:
-        return "not-song"
     else:
-        return "other"
+        return "not-song"
 
 songFileList = wavfileList("/Users/sun-mm/Desktop/v/toko")
 songFileList.sort()
