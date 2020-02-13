@@ -41,14 +41,14 @@ def formatData(filename, aug=None, rates=None):
 
 # 90%超えてたら判定する
 def checkSong(ret):
-    if ret[0][0] > 0.85:
+    if ret[0][0] > 0.5:
         return "song"
     else:
         return "not-song"
 
-songFileList = wavfileList("/Users/sun-mm/Desktop/v/toko")
+songFileList = wavfileList("/Volumes/SUN-HDD/v/o1HCX6TYDMk")
 songFileList.sort()
-model = load_model("model_second_cnn.h5")
+model = load_model("model_20epochs_cnn.h5")
 
 for filename in songFileList:
     ret = model.predict(formatData(filename))

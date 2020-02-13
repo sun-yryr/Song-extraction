@@ -71,5 +71,5 @@ model.compile(loss='categorical_crossentropy',
 
 # model.summary()
 
-model.fit(x_train, y_train, epochs=2, verbose=1, validation_split=0.1, batch_size=1)
-model.save("model_second_cnn.h5")
+model.fit(x_train, y_train, epochs=20, verbose=1, validation_split=0.1, batch_size=2)
+model.save("model_20epochs_cnn.h5")
