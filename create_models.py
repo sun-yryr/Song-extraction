@@ -17,8 +17,8 @@ time          = 3713
 song          = 0
 not_song      = 1
 
-def wavfileList(dirname = "."):
-    _list = Path().glob("./{}/*.wav".format(dirname))
+def wavfileList(dirname):
+    _list = Path(dirname).glob("./*.wav")
     return list(_list)
 
 def calculate_melsp(x, n_fft=1024, hop_length=128):
@@ -46,17 +46,12 @@ def target(path):
         return not_song
 
 # フォルダからファイル名を抽出，ランダムに並べ替えます
-songFileList = wavfileList("example-data/song")
-notSongFileList = wavfileList("example-data/not-song")
+songFileList = wavfileList("/Volumes/SUN-HDD/v/example-data/song")
+notSongFileList = wavfileList("/Volumes/SUN-HDD/v/example-data/not-song")
 rd.shuffle(songFileList)
 rd.shuffle(notSongFileList)
-# 学習データとテストデータを 9:1 で分ける
-checkIndex = int(len(songFileList) * 0.9)
-learn = songFileList[:checkIndex] + notSongFileList[:checkIndex]
-test = songFileList[checkIndex:] + notSongFileList[checkIndex:]
+train = songFileList + notSongFileList
 # ランダムに並べ直す
-rd.shuffle(learn)
-rd.shuffle(test)
+rd.shuffle(train)
 # 出力
-save_np_data("./v-melsp-learn.npz", learn)
-save_np_data("./v-melsp-test.npz", test)
+save_np_data("./v-melsp-train.npz", train)

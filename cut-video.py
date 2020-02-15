@@ -1,29 +1,75 @@
 import wave
 import subprocess
+import struct
 import os
 from pathlib import Path
 from keras.models import load_model
 import librosa
 import numpy as np
 
-# ビデオの長さを返す
-def get_video_length(path):
-    wr = wave.open(path, 'r')
-    fr = wr.getframerate()
-    fn = wr.getnframes()
-    return 1.0 * fn / fr
+import shutil
 
-# FIX ffmpeg じゃなくて wave モジュールを使う
-def cut_video_10sec(path, length):
-    os.makedirs("temp")
-    for i in range(int(length)):
-        outputPath = './temp/{1:05}.wav'.format(i)
-        cmd = 'ffmpeg -loglevel error -i "{0}" -ss {1} -t 10 -acodec copy "{2}"'.format(path, i*10, outputPath)
-        subprocess.run(cmd, shell=True)
+class WavEdit():
+    def __init__(self, path):
+        wr = wave.open(path, "r")
+        self._ch = wr.getnchannels()
+        self._width = wr.getsampwidth()
+        self._fr = wr.getframerate()
+        self._fn = wr.getnframes()
+        self._time = 1.0 * self._fn / self._fr
+        self._data = np.frombuffer(wr.readframes(wr.getnframes()), dtype=np.int16)
+        self._params = wr.getparams()
+        wr.close()
+    
+    def print_meta_data(self):
+        print("Channel: ", self._ch)
+        print("Sample width: ", self._width)
+        print("Frame Rate: ", self._fr)
+        print("Frame num: ", self._fn)
+        print("Params: ", self._params)
+        print("Total time: ", self._time)
+
+    def cut_wav_output(self, outputPath, dur, start = 0):
+        startFrame = int(self._ch * self._fr * start)
+        endFrame = startFrame + int(self._ch * self._fr * dur) + 1
+        if os.path.exists(outputPath):
+            print("File already exists")
+            return
+        Y = self._data[startFrame:endFrame]
+        outd = struct.pack("h" * len(Y), *Y)
+        ww = wave.open(outputPath, "w")
+        ww.setnchannels(self._ch)
+        ww.setsampwidth(self._width)
+        ww.setframerate(self._fr)
+        ww.writeframes(outd)
+        ww.close()
+    
+    def all_cut_10sec(self, outputDir):
+        outputPath = Path(outputDir).resolve()
+        if outputPath.is_file():
+            print("this is not directory")
+            return
+        if not outputPath.is_dir():
+            outputPath.mkdir(parents=True)
+        startFrame = 0
+        durFrame = int(self._ch * self._fr * 10) + 1
+        endFrame = startFrame + durFrame
+        for i in range(int(self._time/10)):
+            p = outputPath / "{:04}.wav".format(i)
+            Y = self._data[startFrame:endFrame]
+            outd = struct.pack("h" * len(Y), *Y)
+            ww = wave.open(str(p), "w")
+            ww.setnchannels(self._ch)
+            ww.setsampwidth(self._width)
+            ww.setframerate(self._fr)
+            ww.writeframes(outd)
+            ww.close()
+            startFrame = endFrame
+            endFrame = startFrame + durFrame
 
 # 指定したディレクトリにあるwavファイルのリストを返す
-def get_wav_filelist(dirname = "."):
-    _list = Path(dirname).glob("./*.wav")
+def get_wav_filelist(p):
+    _list = p.glob("./*.wav")
     _list = list(_list)
     _list.sort()
     return _list
@@ -47,7 +93,7 @@ def validate_song_cnn(fileList):
     time          = 3713
     song          = 0
     not_song      = 1
-    model = load_model("model_20epochs_cnn.h5")
+    model = load_model("model_0214.h5")
     songFlag = [0] * len(fileList)
     for i in range(len(fileList)):
         fileName = fileList[i]
@@ -57,10 +103,11 @@ def validate_song_cnn(fileList):
             songFlag[i] = 1
         else:
             songFlag[i] = 0
-        # print("{} => {} [ {:.2%}, {:.2%} ]".format(fileList[i], songFlag[i], ret[0][0], ret[0][1]))
+        print("{} => {} [ {:.2%}, {:.2%} ]".format(fileList[i], songFlag[i], ret[0][0], ret[0][1]))
     return songFlag
 
 # 判定結果が入った配列を利用して，曲の開始・終了が入った配列を返す
+# FIX いい感じの抽出アルゴリズムを書く
 def get_songs(songFlag):
     flag = 0
     songStart = 0
@@ -81,26 +128,43 @@ def get_songs(songFlag):
         res.append((songStart, len(songFlag)-1))
     return res
 
-# 曲の開始・終了が入った配列から，m4a?ファイルにして出力する
-def output_songs(path, songs):
-    os.makedirs("output", exist_ok=True)
-    for i in range(len(songs)):
-        outputPath = './output/{:04}.wav'.format(i)
-        start = songs[i][0] * 10
-        length = songs[i][1] * 10 - start
-        cmd = 'ffmpeg -loglevel error -i "{0}" -ss {1} -t {2} -acodec copy "{3}"'.format(path, start, length, outputPath)
-        subprocess.run(cmd, shell=True)
+def outputSongList(songlist, outputDir):
+    p = outputDir / "songList.csv"
+    s = "fileName, start, end\n"
+    for i, song in enumerate(songlist):
+        s += "{:02}.wav,{},{}\n".format(i, song[0]*10, song[1]*10)
+    with open(p, "w") as f:
+        f.write(s)
+
 
 
 def main():
-    # path = input()
-    # cut_video_10sec(path, get_video_length(path))
-    # fileList = get_wav_filelist("/Volumes/SUN-HDD/v/o1HCX6TYDMk")
-    # songFlag = validate_song_cnn(fileList)
-    songFlag = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
+    workingDirectory = Path("./temp").resolve()
+    print("intput wave path = ", end="")
+    path = input()
+    print("output dir path = ", end="")
+    outputdir = Path(input()).resolve()
+    w = WavEdit(path)
+    w.print_meta_data()
+    print("wav cutting... ", end="")
+    w.all_cut_10sec(str(workingDirectory))
+    print("finish")
+    fileList = get_wav_filelist(workingDirectory)
+    print("recognition... ", end="")
+    songFlag = validate_song_cnn(fileList)
+    print("finish")
+    # songFlag = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 1, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0, 1, 0, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
     seSongList = get_songs(songFlag)
-    output_songs("/Volumes/SUN-HDD/v/o1HCX6TYDMk.wav", seSongList)
-    # os.remove("./temp")
+    outputdir.mkdir(parents=True)
+    outputSongList(seSongList, outputdir)
+    print("output song... ", end="")
+    for i in range(len(seSongList)):
+        outputPath = outputdir / '{:02}.wav'.format(i)
+        start = seSongList[i][0] * 10
+        length = seSongList[i][1] * 10 - start
+        w.cut_wav_output(str(outputPath), length, start)
+    print("finish")
+    shutil.rmtree(workingDirectory)
 
 
 if __name__ == "__main__":

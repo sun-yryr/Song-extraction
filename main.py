@@ -8,18 +8,14 @@ import numpy as np
 import os
 
 # load npz files
-npz = np.load('./v-melsp-learn.npz')
+npz = np.load('/Volumes/SUN-HDD/v/v-melsp-train.npz')
 y_train = npz['y']
 x_train = npz['x']
-npz = np.load('./v-melsp-test.npz')
-y_test = npz['y']
-x_test = npz['x']
 
-x_train = x_train.reshape(252, 128, 3713, 1)
+x_train = x_train[..., None]
 # redefine target data into one hot vector
 classes = 2
 y_train = keras.utils.to_categorical(y_train, classes)
-y_test = keras.utils.to_categorical(y_test, classes)
 
 def cba(inputs, filters, kernel_size, strides):
     x = Conv2D(filters, kernel_size=kernel_size, strides=strides, padding='same')(inputs)
@@ -71,5 +67,5 @@ model.compile(loss='categorical_crossentropy',
 
 # model.summary()
 
-model.fit(x_train, y_train, epochs=20, verbose=1, validation_split=0.1, batch_size=2)
-model.save("model_20epochs_cnn.h5")
+model.fit(x_train, y_train, epochs=20, verbose=1, validation_split=0.1, batch_size=5)
+model.save("model_0214.h5")
