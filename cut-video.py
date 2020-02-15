@@ -155,7 +155,7 @@ def get_songs(songFlag):
 
 def hasProbabilityAverageSong(songProbabilitys):
     ave = mean(songProbabilitys)
-    if ave >= 0.75:
+    if ave >= 0.8:
         return True
     else:
         return False
@@ -173,7 +173,7 @@ def outputSongList(songlist, outputDir):
 
 def main():
     workingDirectory = Path("./temp").resolve()
-    workingDirectory.mkdir(parents=True)
+    workingDirectory.mkdir(parents=True, exist_ok=True)
     args = sys.argv
     if len(args) == 2:
         # youtube URL からいく
