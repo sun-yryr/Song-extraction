@@ -22,3 +22,4 @@ python_version = "3.7"
 
 [scripts]
 start = "python main.py"
+cut = "python -u cut-video.py"
