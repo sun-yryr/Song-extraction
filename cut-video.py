@@ -116,7 +116,7 @@ def get_songs(songFlag):
             flag += 1
         elif s>0.5:
             flag += 1
-        elif s<=0.5 and flag>=3:
+        elif s<=0.5 and flag>=2:
             if hasProbabilityAverageSong(songFlag[songStart:i]):
                 res.append((songStart, i))
             flag = 0
