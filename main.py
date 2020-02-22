@@ -55,6 +55,7 @@ x = GlobalAveragePooling2D()(x)
 x = Dense(classes)(x)
 x = Activation("softmax")(x)
 
+
 model = Model(inputs, x)
 
 # initiate Adam optimizer

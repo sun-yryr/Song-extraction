@@ -22,6 +22,15 @@ pipenv run cut "変換したいyoutubeのurl"
 output dir path = 保存するパスを入れる
 ```
 
+それか
+```
+pipenv run cut
+
+input wave path = 切るwaveファイルのパスを入れる
+output dir path = 保存するパスを入れる
+```
+
+
 # モデルを作る
 
 あとで
