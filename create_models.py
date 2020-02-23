@@ -53,5 +53,6 @@ rd.shuffle(notSongFileList)
 train = songFileList + notSongFileList
 # ランダムに並べ直す
 rd.shuffle(train)
+print("a")
 # 出力
-save_np_data("./v-melsp-train.npz", train)
+save_np_data("/Volumes/SUN-HDD/v/v-melsp-train.npz", train)

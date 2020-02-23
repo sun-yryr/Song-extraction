@@ -94,7 +94,7 @@ def validate_song_cnn(fileList):
     time          = 3713
     song          = 0
     not_song      = 1
-    model = load_model("model_0214.h5")
+    model = load_model("model_0219_gpu.h5")
     songFlag = [0] * len(fileList)
     for i in range(len(fileList)):
         fileName = fileList[i]
