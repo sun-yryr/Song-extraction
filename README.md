@@ -34,3 +34,18 @@ output dir path = 保存するパスを入れる
 # モデルを作る
 
 あとで
+
+# Docker版
+
+## 開発
+
+```bash
+docker build -t song-extraction:latest -f docker/Dockerfile .
+docker run --rm -it song-extraction:latest bash
+```
+
+## 実行
+
+```bash
+docker run --rm -it -v $(pwd):/app song-extraction:latest {youtube url}
+```
