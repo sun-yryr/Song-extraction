@@ -199,7 +199,10 @@ def main():
     print("finish")
     # songFlag = [1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,0 ,0 ,1 ,1 ,1 ,1 ,1 ,1 ,0 ,0 ,0 ,1 ,1 ,1]
     seSongList = get_songs(songFlag)
-    outputdir.mkdir(parents=True)
+    try:
+        outputdir.mkdir(parents=True)
+    except:
+        pass
     outputSongList(seSongList, outputdir)
     print("output song... ", end="")
     for i in range(len(seSongList)):
